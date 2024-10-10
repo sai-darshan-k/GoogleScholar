@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Scholar Scraper</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1 {
+            color: #0056b3;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #0056b3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+            display: block;
+            margin: 10px auto;
+        }
+
+        button:hover {
+            background-color: #004494;
+        }
+
+        #results {
+            margin-top: 20px;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #0056b3;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        #searchContainer {
+            text-align: center;
+            margin: 20px auto;
+        }
+
+        #searchBar {
+            padding: 10px;
+            width: 300px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        #loadingMessage {
+            text-align: center;
+            font-size: 18px;
+            color: #0056b3;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            button {
+                width: 100%;
+            }
+
+            #searchBar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Scholar Data Retrieval</h1>
+    <div id="searchContainer">
+        <input type="text" id="searchBar" placeholder="Search by name..." />
+        <button id="searchButton">Search</button>
+    </div>
+    <button id="scrapeButton">Fetch Data for All Scholars</button>
+    <div id="loadingMessage"></div>
+    <div id="results"></div>
+
+    <script>
+        let facultyData = [];
+    
+        $(document).ready(function() {
+            // Add loading message before fetching data
+            $('#scrapeButton').click(function() {
+                // Show the loading message
+                $('#loadingMessage').text('Loading... please wait');
+                
+                // Clear any previous results
+                $('#results').empty();
+    
+                // Perform the AJAX request to fetch data
+                $.ajax({
+                    url: '/scrape',
+                    type: 'GET',
+                    success: function(data) {
+                        facultyData = data;  // Store the faculty data
+                        displayResults(data);
+    
+                        // Hide the loading message once data is fetched
+                        $('#loadingMessage').text('');
+                    },
+                    error: function() {
+                        $('#results').append('<p>An error occurred while fetching data.</p>');
+    
+                        // Hide the loading message if there's an error
+                        $('#loadingMessage').text('');
+                    }
+                });
+            });
+    
+            // Search function
+            $('#searchButton').click(function() {
+                const searchTerm = $('#searchBar').val().toLowerCase();
+                const foundFaculty = facultyData.filter(faculty => faculty.Name.toLowerCase().includes(searchTerm));
+    
+                if (foundFaculty) {
+                    displayResults([foundFaculty]);
+                } else {
+                    $('#results').empty().append('<p>No matching faculty found.</p>');
+                }
+            });
+        });
+    
+        // Function to display results
+        function displayResults(data) {
+            let resultsDiv = $('#results');
+            resultsDiv.empty();
+    
+            if (data.length === 0) {
+                resultsDiv.append('<p>No data found.</p>');
+            } else {
+                let table = '<table><thead><tr>' +
+                            '<th>Name</th>' +
+                            '<th>Citations</th>' +
+                            '<th>H-Index</th>' +
+                            '<th>i10-Index</th>' +
+                            '<th>Yearly Citations</th>' +
+                            '</tr></thead><tbody>';
+    
+                data.forEach(function(faculty, index) {
+                    table += '<tr>' +
+                             `<td><a href="#" class="faculty-name" data-index="${index}">${faculty.Name}</a></td>` +
+                             '<td>' + faculty.Citations + '</td>' +
+                             '<td>' + faculty.H_Index + '</td>' +
+                             '<td>' + faculty.i10_Index + '</td>' +
+                             '<td>' + JSON.stringify(faculty.Yearly_Citations) + '</td>' +
+                             '</tr>';
+    
+                    // Add an empty row for papers, initially hidden
+                    table += `<tr class="papers-row" id="papers-${index}" style="display:none"><td colspan="5"></td></tr>`;
+                });
+    
+                table += '</tbody></table>';
+                resultsDiv.append(table);
+    
+                // Attach click event to show papers when faculty name is clicked
+                $('.faculty-name').click(function(e) {
+                    e.preventDefault();
+                    let index = $(this).data('index');
+                    let papersRow = $(`#papers-${index}`);
+    
+                    if (papersRow.is(':visible')) {
+                        papersRow.hide();  // Hide papers if already visible
+                    } else {
+                        let papers = data[index].Papers;
+                        let papersContent = '';
+    
+                        if (papers.length > 0) {
+                            papersContent += '<table><thead><tr>' +
+                                             '<th>Title</th><th>Citations</th><th>Year</th><th>Link</th></tr></thead><tbody>';
+                            papers.forEach(function(paper) {
+                                papersContent += '<tr>' +
+                                                 '<td>' + paper.title + '</td>' +
+                                                 '<td>' + paper.citations + '</td>' +
+                                                 '<td>' + paper.year + '</td>' +
+                                                 '<td><a href="' + paper.link + '">Link</a></td>' +
+                                                 '</tr>';
+                            });
+                            papersContent += '</tbody></table>';
+                        } else {
+                            papersContent = '<p>No papers available</p>';
+                        }
+    
+                        papersRow.find('td').html(papersContent);
+                        papersRow.show();  // Show papers
+                    }
+                });
+            }
+        }
+    </script>
+    
+</body>
+</html>
